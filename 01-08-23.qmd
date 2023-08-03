@@ -1,0 +1,85 @@
+---
+title: "01-08-2023"
+author: "David Will"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+## Dependencies
+
+```{r}
+if(!"pacman" %in% installed.packages()) install.packages("pacman")
+pacman::p_load(here, tidyverse, tidytuesdayR, mapdata, sf, ggthemes, scales, plotly)
+options(scipen = 999)
+```
+
+## Import
+
+```{r}
+states_raw <- tt_load("2023-08-01")$states
+states %>% glimpse()
+
+etymology <- tt_load("2023-08-01")$state_name_etymology
+etymology
+```
+
+
+Where do all the people live?
+
+```{r}
+mapdata <- map_data("state") %>% 
+  st_as_sf(coords = c("long", "lat")) %>% 
+  group_by(region) %>% 
+  summarise(geometry = st_combine(geometry)) %>% 
+  st_cast("POLYGON") %>% 
+  mutate(region = str_to_title(region))
+
+states <- states_raw %>% 
+  full_join(mapdata, by = c("state" = "region")) %>% 
+  filter(!state %in% c("Hawaii", "Alaska", "District Of Columbia")) %>% 
+  st_as_sf()
+
+states %>% 
+  arrange(desc(population_2020))
+
+states %>%
+  ggplot() +
+  geom_sf(aes(fill = population_2020)) + 
+  scale_fill_binned(type = "viridis", 
+                    labels = unit_format(unit = "M", scale = 1e-6)) +
+  labs(title = "US states by population",
+       legend = "") +
+  theme_void() +
+  theme(legend.position = "bottom",
+        legend.title = element_blank())
+```
+
+Where are they packed?
+
+```{r}
+pop_density_scatter <- states %>%
+  ggplot(aes(x = total_area_km2, y = population_2020, label = state)) +
+  geom_point() +
+  labs(title = "US states by population density",
+       x = "Area in km2",
+       y = "Population") +
+  theme_light() +
+  scale_x_continuous(labels = unit_format(unit = "K", scale = 1e-3)) +
+  scale_y_continuous(labels = unit_format(unit = "M", scale = 1e-6))
+
+pop_density_scatter %>% 
+  ggplotly()
+```
+
+
+
+```{r}
+etymology %>% 
+  count(language) %>% 
+  arrange(desc(n)) %>% view()
+```
+
+
+
