@@ -84,21 +84,16 @@ union <- states %>%
          lang = ifelse(is.na(lang), "Other", lang)) %>%
   count(admission, lang)
 
-union
-
 # fill and sum
-union_timeline <- tibble(admission = seq(1787, 1912, 1)) %>% 
+union_timeline <- union %>% 
+  expand(admission = full_seq(admission, 1), lang) %>% 
   left_join(union) %>% 
-  complete(admission, lang) %>% 
-  filter(!is.na(lang)) %>% 
   mutate(n = replace_na(n, 0),
          lang = fct_relevel(as_factor(lang), "English", "French", "Spanish", "Other")) %>% 
   group_by(lang) %>% 
   mutate(n_cum = cumsum(n)) %>% 
   ungroup()
-
-union_timeline
-
+  
 # plot
 ggplot(union_timeline, aes(x = admission, y = n_cum, fill = lang)) +
   geom_area() +
