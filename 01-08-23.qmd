@@ -2,7 +2,7 @@
 title: "01-08-2023"
 author: "David Will"
 format: html
-editor: visual
+editor: source
 editor_options: 
   chunk_output_type: console
 ---
@@ -11,20 +11,16 @@ editor_options:
 
 ```{r}
 if(!"pacman" %in% installed.packages()) install.packages("pacman")
-pacman::p_load(here, tidyverse, tidytuesdayR, mapdata, sf, ggthemes, scales, plotly)
-options(scipen = 999)
+pacman::p_load(here, tidyverse, tidytuesdayR, mapdata, sf, ggthemes, scales, plotly, lubridate, ggstream)
+#options(scipen = 999)
 ```
 
 ## Import
 
 ```{r}
 states_raw <- tt_load("2023-08-01")$states
-states %>% glimpse()
-
 etymology <- tt_load("2023-08-01")$state_name_etymology
-etymology
 ```
-
 
 Where do all the people live?
 
@@ -62,6 +58,7 @@ Where are they packed?
 pop_density_scatter <- states %>%
   ggplot(aes(x = total_area_km2, y = population_2020, label = state)) +
   geom_point() +
+  geom_smooth(method = "lm") +
   labs(title = "US states by population density",
        x = "Area in km2",
        y = "Population") +
@@ -74,12 +71,63 @@ pop_density_scatter %>%
 ```
 
 
+Names seem to originate mostly from English, French and Spanish. Where there trends in union admission?
 
 ```{r}
-etymology %>% 
-  count(language) %>% 
-  arrange(desc(n)) %>% view()
+# categorize and count
+union <- states %>%
+  as_tibble() %>% 
+  left_join(etymology, by = "state") %>% 
+  select(state, admission, language) %>%
+  mutate(admission = year(admission),
+         lang = str_extract(language, "(English|French|Spanish)(?! via)"),
+         lang = ifelse(is.na(lang), "Other", lang)) %>%
+  count(admission, lang)
+
+union
+
+# fill and sum
+union_timeline <- tibble(admission = seq(1787, 1912, 1)) %>% 
+  left_join(union) %>% 
+  complete(admission, lang) %>% 
+  filter(!is.na(lang)) %>% 
+  mutate(n = replace_na(n, 0),
+         lang = fct_relevel(as_factor(lang), "English", "French", "Spanish", "Other")) %>% 
+  group_by(lang) %>% 
+  mutate(n_cum = cumsum(n)) %>% 
+  ungroup()
+
+union_timeline
+
+# plot
+ggplot(union_timeline, aes(x = admission, y = n_cum, fill = lang)) +
+  geom_area() +
+  scale_x_continuous(breaks = c(1800, 1820, 1840, 1860, 1880, 1900)) +
+  coord_cartesian(expand = FALSE) +
+  theme_minimal() +
+  theme(legend.title = element_blank(),
+        panel.grid.minor = element_blank()) +
+  labs(title = "Origins of US State Names",
+       x = "Admission to Union",
+       y = "Count",
+       caption = "Total count greater than 50 due to few states where names could originate from various languages.")
 ```
 
+- bin names of native american descent?
+- prettify (colors, labels, margins, font, highlight)
+- pull in other data (welfare etc) & compare to admission date
 
 
+
+
+
+
+
+```{r}
+# Streamgraph provides wrong estimates?
+ggplot(union_timeline, aes(x = admission, y = n_cum, fill = lang)) +
+  geom_stream(true_range = "both") +
+  scale_x_continuous(limits = c(1780, 1920),
+                     breaks = c(1780, 1800, 1820, 1840, 1860, 1880, 1900, 1920)) +
+  coord_cartesian(expand = FALSE)
+```
