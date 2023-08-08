@@ -1,0 +1,106 @@
+---
+title: "08-08-23"
+format: html
+editor: source
+editor_options: 
+  chunk_output_type: console
+---
+
+## Dependencies
+
+```{r}
+if(!"pacman" %in% installed.packages()) install.packages("pacman")
+pacman::p_load(here, tidyverse, tidytuesdayR, scales, ggthemes)
+
+```
+
+## Load Data
+
+```{r}
+episodes <- tt_load("2023-08-08")$episodes %>% 
+  filter(episode_season != 999)
+
+sauces <- tt_load("2023-08-08")$sauces
+```
+
+## Episodes
+
+```{r}
+view(episodes)
+```
+
+Number of episodes per season
+
+```{r}
+episodes %>% 
+  count(season) %>% 
+  ggplot(aes(x = season, y = n)) +
+  geom_line() +
+  labs(title = "Number of episodes per season")
+```   
+
+share of guests that finished per season
+
+```{r}
+episodes %>% 
+  group_by(season) %>% 
+  summarise(finished_pct = sum(finished) * 100 / n()) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = season, y = finished_pct)) +
+  geom_line() +
+  scale_y_continuous(labels = label_percent(scale = 1),
+                     limits = c(70, 100)) +
+  coord_cartesian(expand = FALSE) +
+  labs(title = "Share of guests that tried all sauces",
+       y = NULL) +
+  theme_minimal() +
+  theme(axis.title.x = element_text(hjust = 1),
+        plot.title = element_text(margin = margin(0, 0, 16, 0)),
+        plot.title.position = "plot")
+```
+
+Which guests appeared most often?
+
+```{r}
+glimpse(episodes)
+episodes %>% 
+  group_by(guest) %>% 
+  summarise(max_appearances = max(guest_appearance_number)) %>% 
+  arrange(desc(max_appearances)) %>% view()
+```
+
+
+
+## Sauces
+
+```{r}
+glimpse(sauces)
+```
+
+Range of spicyness over time
+
+```{r}
+sauces %>% 
+  group_by(season) %>% 
+  summarise(max = max(scoville),
+            min = min(scoville),
+            season = as_factor(season)) %>% 
+  mutate(season = fct_rev(season)) %>% 
+  ungroup() %>% 
+  ggplot() +
+  geom_segment(aes(x = min, xend = max, y = season, yend = season)) +
+  geom_point(aes(x = min, y = season), color = "blue") +
+  geom_point(aes(x = max, y = season), color = "red") +
+  theme_minimal() +
+  labs(title = "Range of spicyness over time")
+```
+
+
+
+
+
+
+
+
+
+
